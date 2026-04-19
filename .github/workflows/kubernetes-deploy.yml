@@ -3,14 +3,11 @@
 #
 # O que faz:
 #   - Checkout do repositório
-#   - Configura kubectl com um kubeconfig armazenado em Secret
+#   - Cria um cluster Kubernetes efêmero com Kind dentro do runner
 #   - Aplica k8s/deployment.yaml e k8s/prometheus.yaml
 #   - Aguarda rollout dos Deployments
 #
-# Configuração no GitHub (Settings → Secrets and variables → Actions):
-#   KUBE_CONFIG — conteúdo completo do arquivo ~/.kube/config (cole o YAML).
-#                 Alternativa: use KUBE_CONFIG_B64 (kubeconfig em base64) e
-#                 descomente o bloco correspondente no job abaixo.
+# Nenhum secret necessário: o Kind cria o cluster e o kubeconfig localmente.
 #
 # Opcional (build + push Docker Hub antes do deploy):
 #   DOCKERHUB_USERNAME, DOCKERHUB_TOKEN — descomente o job "build-push-image".
@@ -32,32 +29,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Instalar kubectl
-        uses: azure/setup-kubectl@v4
-        with:
-          version: v1.29.0
-
-      - name: Configurar acesso ao cluster
-        env:
-          KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
+      - name: Criar cluster Kind
         run: |
           set -euo pipefail
-          mkdir -p "$HOME/.kube"
-          if [[ -z "$KUBE_CONFIG" ]]; then
-            echo "Defina o secret KUBE_CONFIG no repositório (Settings → Secrets → Actions)."
-            exit 1
-          fi
-          echo "$KUBE_CONFIG" > "$HOME/.kube/config"
-          chmod 600 "$HOME/.kube/config"
-          kubectl version --client
-          kubectl cluster-info || true
-
-      # Se preferir secret em base64, comente o bloco acima e use:
-      # - name: Configurar kubeconfig (base64)
-      #   run: |
-      #     mkdir -p "$HOME/.kube"
-      #     echo "${{ secrets.KUBE_CONFIG_B64 }}" | base64 -d > "$HOME/.kube/config"
-      #     chmod 600 "$HOME/.kube/config"
+          curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.23.0/kind-linux-amd64
+          chmod +x ./kind && sudo mv ./kind /usr/local/bin/kind
+          kind create cluster --name controle-compras --wait 60s
+          kubectl cluster-info --context kind-controle-compras
 
       - name: Aplicar Kubernetes
         working-directory: ${{ github.workspace }}
@@ -69,7 +47,7 @@ jobs:
       - name: Aguardar rollout
         run: |
           set -euo pipefail
-          kubectl rollout status deployment/controle-compras -n "$K8S_NAMESPACE" --timeout=300s
+          kubectl rollout status deployment/controle-compras-backend -n "$K8S_NAMESPACE" --timeout=300s
           kubectl rollout status deployment/prometheus -n "$K8S_NAMESPACE" --timeout=300s
           kubectl rollout status deployment/grafana -n "$K8S_NAMESPACE" --timeout=300s
           kubectl get pods,svc -n "$K8S_NAMESPACE"
