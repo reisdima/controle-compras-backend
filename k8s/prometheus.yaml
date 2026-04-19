@@ -18,6 +18,19 @@ data:
         static_configs:
           - targets: [localhost:9090]
 ---
+# PersistentVolumeClaim for Prometheus data
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: prometheus-pvc
+  namespace: controle-compras
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -53,7 +66,7 @@ spec:
           volumeMounts:
             - name: config
               mountPath: /etc/prometheus
-            - name: data
+            - name: prometheus-data
               mountPath: /prometheus
           readinessProbe:
             httpGet:
@@ -78,8 +91,9 @@ spec:
         - name: config
           configMap:
             name: prometheus-config
-        - name: data
-          emptyDir: {}
+        - name: prometheus-data
+          persistentVolumeClaim:
+            claimName: prometheus-pvc
 ---
 apiVersion: v1
 kind: Service
