@@ -1,11 +1,9 @@
 spring:
   application:
     name: controle-compras-backend
-  security:
-    oauth2:
-      resourceserver:
-        jwt:
-          issuer-uri: http://localhost:8081/realms/controle-compras
+  cloud:
+    openfeign:
+      lazy-attributes-resolution: true
   datasource:
     # protocolo://host:port/recurso
     url: jdbc:postgresql://localhost:5432/controle_compras_db
@@ -20,5 +18,15 @@ spring:
         format_sql: true
         hibernate.jdbc.time_zone: America/Sao_Paulo
     hibernate:
-      ddl-auto: none
+      ddl-auto: update
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+
+api:
+  openfood:
+    url: https://world.openfoodfacts.org/api/v2
 
